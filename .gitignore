@@ -1,0 +1,13 @@
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+flash-attention/
+harmony/
+llguidance/
+msgspec/
+outlines-core/
+safetensors/
+tokenizers/
+vllm/
+xgrammar/

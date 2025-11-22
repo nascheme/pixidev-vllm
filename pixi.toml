@@ -1,0 +1,165 @@
+[workspace]
+authors = ["Ralf Gommers <ralf.gommers@gmail.com>"]
+channels = ["https://prefix.dev/conda-forge"]
+name = "pixidev-vllm"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[dependencies]
+cxx-compiler = ">=1.11.0,<2"
+numactl = ">=2.0.18,<3"
+python-freethreading = "3.14.*"
+cmake = ">=4.2.0,<5"
+ninja = ">=1.13.1,<2"
+numpy = ">=2.3.5,<3"
+pyyaml = ">=6.0.3,<7"
+regex = ">=2025.11.3,<2026"
+scipy = ">=1.16.3,<2"
+blake3 = ">=1.0.8,<2"
+aiohttp = ">=3.13.2,<4"
+psutil = ">=7.1.3,<8"
+setproctitle = ">=1.3.6,<2"
+pybase64 = ">=1.4.2,<2"
+python-build = ">=1.3.0,<2"
+pip = ">=25.3,<26"
+setuptools = ">=80.9.0,<81"
+setuptools-scm = ">=9.2.2,<10"
+maturin = ">=1.10.2,<2"
+scikit-build-core = ">=0.11.6,<0.12"
+ccache = ">=4.11.3,<5"
+
+[pypi-dependencies]
+pillow = ">=12.0.0, <13"
+sentencepiece = ">=0.2.1, <0.3"
+pyzmq = ">=27.1.0, <28"
+watchfiles = ">=1.1.1, <2"
+gguf = "*"
+pydantic = "*"
+cachetools = ">=6.2.2, <7"
+cloudpickle = ">=3.1.2, <4"
+msgspec = { path = "./msgspec/msgspec" }
+py-cpuinfo = ">=9.0.0, <10"
+openai = ">=2.8.1, <3"
+openai-harmony = ">=0.0.8, <0.0.9"
+prometheus-client = ">=0.23.1, <0.24"
+fastapi = ">=0.121.3, <0.122"
+diskcache = ">=5.6.3, <6"
+partial-json-parser = ">=0.2.1.1.post7, <0.3"
+cbor2 = ">=5.7.1, <6"
+anthropic = ">=0.74.1, <0.75"
+uvloop = ">=0.22.1, <0.23"
+model-hosting-container-standards = ">=0.1.9, <0.2"
+prometheus-fastapi-instrumentator = ">=7.1.0, <8"
+uvicorn = ">=0.38.0, <0.39"
+python-multipart = ">=0.0.20, <0.0.21"
+modelscope = ">=1.32.0, <2"
+
+[feature.test.dependencies]
+pytest = "*"
+tblib = "*"
+
+[feature.test.pypi-dependencies]
+huggingface-hub = "*"
+transformers = "==4.57.1"
+
+[feature.setup.tasks.clean]
+args = ["repo"]
+cmd = "rm -rf {{ repo }}/{{ repo }}"
+description = "Clean the {repo}/{repo} directory."
+
+[feature.setup.tasks._repo_clone]
+args = ["org", "repo"]
+cmd = "gh repo clone {{ org }}/{{ repo }} {{ repo | lower }}/{{ repo }} -- --recurse-submodules"
+
+[feature.setup.tasks._repo_set_default]
+args = ["repo"]
+cmd = "cd {{ repo }}/{{ repo }}; gh repo set-default"
+
+[feature.setup.tasks.clone]
+args = ["org", "repo"]
+depends-on = [
+  { task = "clean", args = ["{{ repo }}"] },
+  { task = "_repo_clone", args = ["{{ org }}", "{{ repo }}"] },
+  { task = "_repo_set_default", args = ["{{ repo }}"] },
+]
+description = "Clone a given {org}/{repo} source from GitHub into the {repo}/{repo} directory of the workspace. Set the upstream repo as default, and set a fork as origin."
+
+[feature.setup.tasks.clone-all]
+depends-on = [
+  #"clone-vllm", "clone-msgspec", "clone-outlinescore", "clone-llguidance",
+  "clone-msgspec", "clone-outlinescore", "clone-llguidance",
+  "clone-harmony", "clone-safetensors", "clone-tokenizers", "clone-xgrammar",
+]
+description = "Clone all repositories into the workspace."
+
+[feature.setup.tasks.clone-vllm]
+depends-on = [{ task = "clone", args = ["vllm-project", "vllm"] }]
+description = "Clone the vllm-project/vllm source into the workspace."
+
+[feature.setup.tasks.clone-vllm-flash-attention]
+depends-on = [{ task = "clone", args = ["vllm-project", "flash-attention"] }]
+description = "Clone the vllm-project/flash-attention source into the workspace."
+
+[feature.setup.tasks.clone-msgspec]
+depends-on = [{ task = "clone", args = ["jcrist", "msgspec"] }]
+
+[feature.setup.tasks.clone-outlinescore]
+depends-on = [{ task = "clone", args = ["dottxt-ai", "outlines-core"] }]
+cmd = "cd outlines-core/outlines-core && gh pr checkout 238 && cd ../.."
+
+[feature.setup.tasks.clone-llguidance]
+depends-on = [{ task = "clone", args = ["guidance-ai", "llguidance"] }]
+
+[feature.setup.tasks.clone-harmony]
+depends-on = [{ task = "clone", args = ["openai", "harmony"] }]
+
+[feature.setup.tasks.clone-safetensors]
+depends-on = [{ task = "clone", args = ["huggingface", "safetensors"] }]
+
+[feature.setup.tasks.clone-tokenizers]
+depends-on = [{ task = "clone", args = ["huggingface", "tokenizers"] }]
+
+[feature.setup.tasks.clone-xgrammar]
+depends-on = [{ task = "clone", args = ["mlc-ai", "xgrammar"] }]
+
+
+[feature.cuda]
+platforms = ["linux-64"]
+system-requirements = { cuda = "12" }
+
+[feature.cuda.dependencies]
+cuda-compiler = "*"
+cuda-libraries-dev = "*"
+cuda-version = "12.8.*"
+
+[feature.cuda.pypi-dependencies]
+torch = { version = ">=2.9.1, <3" }
+torchaudio = { version = ">=2.9.1, <3" }
+
+[feature.cuda.tasks.build-cuda]
+cmd ="python -m pip install -e . -v --no-build-isolation --no-deps"
+cwd = "vllm/vllm"
+description = "Build vLLM in editable mode for CUDA"
+env = { CC = "ccache $CC", CXX = "ccache $CXX", nvcc="ccache nvcc", CMAKE_KEEP_TEMP_FILES="1", CUDA_PATH="$CONDA_PREFIX", CUDA_HOME="$CONDA_PREFIX", CMAKE_CUDA_COMPILER="$CONDA_PREFIX/bin/nvcc", VLLM_FLASH_ATTN_SRC_DIR="$PIXI_PROJECT_ROOT/flash-attention/flash-attention", TORCH_CUDA_ARCH_LIST="8.0", MAX_JOBS="8" }
+
+[feature.cuda.activation]
+scripts = ["./activate-cuda.sh"]
+
+[feature.cpu.pypi-dependencies]
+#torch = { version = ">=2.9.1, <3", index = "https://download.pytorch.org/whl/cpu" }
+#torchaudio = { version = ">=2.9.1, <3", index = "https://download.pytorch.org/whl/cpu" }
+torch = { version = ">2.9.9.rc1, <3", index = "https://download.pytorch.org/whl/nightly/cpu" }
+torchaudio = { version = ">2.9.9.rc1, <3", index = "https://download.pytorch.org/whl/nightly/cpu" }
+
+[feature.cpu.tasks.build-cpu]
+cmd = "VLLM_TARGET_DEVICE=cpu python -m pip install -e . -v --no-build-isolation --no-deps"
+cwd = "vllm/vllm"
+description = "Build vLLM in editable mode for CPU"
+env = { CC = "ccache $CC", CXX = "ccache $CXX" }
+
+
+[environments]
+cpu = ["cpu", "test"]
+cuda = ["cuda", "test"]
+setup = ["setup"]
+
