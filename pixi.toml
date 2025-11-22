@@ -86,7 +86,7 @@ description = "Clone a given {org}/{repo} source from GitHub into the {repo}/{re
 
 [feature.setup.tasks.clone-all]
 depends-on = [
-  #"clone-vllm", "clone-msgspec", "clone-outlinescore", "clone-llguidance",
+  "clone-vllm", "clone-vllm-flash-attention",
   "clone-msgspec", "clone-outlinescore", "clone-llguidance",
   "clone-harmony", "clone-safetensors", "clone-tokenizers", "clone-xgrammar",
 ]
