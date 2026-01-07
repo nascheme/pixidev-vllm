@@ -37,7 +37,7 @@ gguf = "*"
 pydantic = "*"
 cachetools = ">=6.2.2, <7"
 cloudpickle = ">=3.1.2, <4"
-msgspec = { path = "./msgspec/msgspec" }
+msgspec = ">=0.20.0"
 py-cpuinfo = ">=9.0.0, <10"
 openai = ">=2.8.1, <3"
 openai-harmony = ">=0.0.8, <0.0.9"
@@ -87,7 +87,7 @@ description = "Clone a given {org}/{repo} source from GitHub into the {repo}/{re
 [feature.setup.tasks.clone-all]
 depends-on = [
   "clone-vllm", "clone-vllm-flash-attention",
-  "clone-msgspec", "clone-outlinescore", "clone-llguidance",
+  "clone-outlinescore", "clone-llguidance",
   "clone-harmony", "clone-safetensors", "clone-tokenizers", "clone-xgrammar",
 ]
 description = "Clone all repositories into the workspace."
@@ -99,9 +99,6 @@ description = "Clone the vllm-project/vllm source into the workspace."
 [feature.setup.tasks.clone-vllm-flash-attention]
 depends-on = [{ task = "clone", args = ["vllm-project", "flash-attention"] }]
 description = "Clone the vllm-project/flash-attention source into the workspace."
-
-[feature.setup.tasks.clone-msgspec]
-depends-on = [{ task = "clone", args = ["jcrist", "msgspec"] }]
 
 [feature.setup.tasks.clone-outlinescore]
 depends-on = [{ task = "clone", args = ["dottxt-ai", "outlines-core"] }]
@@ -161,5 +158,5 @@ env = { CC = "ccache $CC", CXX = "ccache $CXX" }
 [environments]
 cpu = ["cpu", "test"]
 cuda = ["cuda", "test"]
-setup = ["setup"]
+setup = { features = ["setup"], no-default-feature = true }
 
