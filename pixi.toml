@@ -3,7 +3,7 @@ authors = ["Ralf Gommers <ralf.gommers@gmail.com>"]
 channels = ["https://prefix.dev/conda-forge"]
 name = "pixidev-vllm"
 platforms = ["linux-64"]
-version = "0.1.0"
+version = "0.2.0"
 
 [dependencies]
 cxx-compiler = ">=1.11.0,<2"
@@ -53,6 +53,7 @@ prometheus-fastapi-instrumentator = ">=7.1.0, <8"
 uvicorn = ">=0.38.0, <0.39"
 python-multipart = ">=0.0.20, <0.0.21"
 modelscope = ">=1.32.0, <2"
+einops = ">=0.8.1" # Required for Qwen2-VL.
 
 [feature.test.dependencies]
 pytest = "*"
@@ -67,22 +68,10 @@ args = ["repo"]
 cmd = "rm -rf {{ repo }}/{{ repo }}"
 description = "Clean the {repo}/{repo} directory."
 
-[feature.setup.tasks._repo_clone]
-args = ["org", "repo"]
-cmd = "gh repo clone {{ org }}/{{ repo }} {{ repo | lower }}/{{ repo }} -- --recurse-submodules"
-
-[feature.setup.tasks._repo_set_default]
-args = ["repo"]
-cmd = "cd {{ repo }}/{{ repo }}; gh repo set-default"
-
 [feature.setup.tasks.clone]
 args = ["org", "repo"]
-depends-on = [
-  { task = "clean", args = ["{{ repo }}"] },
-  { task = "_repo_clone", args = ["{{ org }}", "{{ repo }}"] },
-  { task = "_repo_set_default", args = ["{{ repo }}"] },
-]
-description = "Clone a given {org}/{repo} source from GitHub into the {repo}/{repo} directory of the workspace. Set the upstream repo as default, and set a fork as origin."
+cmd = "python3 clone-repos.py --repo {{ repo }}"
+description = "Clone a given {org}/{repo} source from GitHub into the {repo}/{repo} directory of the workspace."
 
 [feature.setup.tasks.clone-all]
 depends-on = [
@@ -102,7 +91,6 @@ description = "Clone the vllm-project/flash-attention source into the workspace.
 
 [feature.setup.tasks.clone-outlinescore]
 depends-on = [{ task = "clone", args = ["dottxt-ai", "outlines-core"] }]
-cmd = "cd outlines-core/outlines-core && gh pr checkout 238 && cd ../.."
 
 [feature.setup.tasks.clone-llguidance]
 depends-on = [{ task = "clone", args = ["guidance-ai", "llguidance"] }]
@@ -130,14 +118,14 @@ cuda-libraries-dev = "*"
 cuda-version = "12.8.*"
 
 [feature.cuda.pypi-dependencies]
-torch = { version = ">=2.9.1, <3" }
-torchaudio = { version = ">=2.9.1, <3" }
+torch = { version = ">=2.10.0, <3" }
+torchaudio = { version = ">=2.10.0, <3" }
 
 [feature.cuda.tasks.build-cuda]
 cmd ="python -m pip install -e . -v --no-build-isolation --no-deps"
 cwd = "vllm/vllm"
 description = "Build vLLM in editable mode for CUDA"
-env = { CC = "ccache $CC", CXX = "ccache $CXX", nvcc="ccache nvcc", CMAKE_KEEP_TEMP_FILES="1", CUDA_PATH="$CONDA_PREFIX", CUDA_HOME="$CONDA_PREFIX", CMAKE_CUDA_COMPILER="$CONDA_PREFIX/bin/nvcc", VLLM_FLASH_ATTN_SRC_DIR="$PIXI_PROJECT_ROOT/flash-attention/flash-attention", TORCH_CUDA_ARCH_LIST="8.0", MAX_JOBS="8" }
+env = { CC = "ccache $CC", CXX = "ccache $CXX", nvcc="ccache nvcc", CMAKE_KEEP_TEMP_FILES="1", CUDA_PATH="$CONDA_PREFIX", CUDA_HOME="$CONDA_PREFIX", CMAKE_CUDA_COMPILER="$CONDA_PREFIX/bin/nvcc", VLLM_FLASH_ATTN_SRC_DIR="$PIXI_PROJECT_ROOT/flash-attention/flash-attention", TORCH_CUDA_ARCH_LIST="7.5", MAX_JOBS="32" }
 
 [feature.cuda.activation]
 scripts = ["./activate-cuda.sh"]

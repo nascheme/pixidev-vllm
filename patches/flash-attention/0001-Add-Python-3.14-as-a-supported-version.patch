@@ -1,0 +1,25 @@
+From a22e4e5d99422d4d7a717ace275f020e9d96979d Mon Sep 17 00:00:00 2001
+From: Neil Schemenauer <nas@arctrix.com>
+Date: Wed, 4 Feb 2026 20:58:56 +0000
+Subject: [PATCH] Add Python 3.14 as a supported version.
+
+---
+ CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 88c334b..c122834 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -19,7 +19,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/cmake/utils.cmake)
+ set(ignoreMe "${VLLM_PYTHON_PATH}")
+ 
+ # Supported python versions. These should be kept in sync with setup.py.
+-set(PYTHON_SUPPORTED_VERSIONS "3.9" "3.10" "3.11" "3.12" "3.13")
++set(PYTHON_SUPPORTED_VERSIONS "3.9" "3.10" "3.11" "3.12" "3.13" "3.14")
+ 
+ # Supported NVIDIA architectures.
+ set(CUDA_SUPPORTED_ARCHS "8.0;8.6;8.9;9.0")
+-- 
+2.43.0
+

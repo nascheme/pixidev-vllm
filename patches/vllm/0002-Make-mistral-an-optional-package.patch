@@ -1,0 +1,108 @@
+From 21411d6593b84b4f2882c88ea3fd32d453b8242a Mon Sep 17 00:00:00 2001
+From: Neil Schemenauer <nas@arctrix.com>
+Date: Wed, 4 Feb 2026 20:57:27 +0000
+Subject: [PATCH 2/2] Make "mistral" an optional package.
+
+---
+ vllm/entrypoints/llm.py                       | 3 +--
+ vllm/tokenizers/mistral.py                    | 1 +
+ vllm/v1/engine/input_processor.py             | 7 +++----
+ vllm/v1/structured_output/backend_xgrammar.py | 3 +--
+ 4 files changed, 6 insertions(+), 8 deletions(-)
+
+diff --git a/vllm/entrypoints/llm.py b/vllm/entrypoints/llm.py
+index f3f774bef..127c8560c 100644
+--- a/vllm/entrypoints/llm.py
++++ b/vllm/entrypoints/llm.py
+@@ -74,7 +74,6 @@ from vllm.renderers import ChatParams, TokenizeParams, merge_kwargs
+ from vllm.sampling_params import BeamSearchParams, RequestOutputKind, SamplingParams
+ from vllm.tasks import PoolingTask
+ from vllm.tokenizers import TokenizerLike
+-from vllm.tokenizers.mistral import MistralTokenizer
+ from vllm.usage.usage_lib import UsageContext
+ from vllm.utils.collection_utils import as_iter, is_list_of
+ from vllm.utils.counter import Counter
+@@ -1382,7 +1381,7 @@ class LLM:
+         model_config = self.model_config
+         tokenizer = self.get_tokenizer()
+ 
+-        if isinstance(tokenizer, MistralTokenizer):
++        if hasattr(tokenizer, 'is_mistral'):
+             raise ValueError("Score API is not supported for Mistral tokenizer")
+ 
+         if len(data_1) == 1:
+diff --git a/vllm/tokenizers/mistral.py b/vllm/tokenizers/mistral.py
+index bb85052db..e676dfc51 100644
+--- a/vllm/tokenizers/mistral.py
++++ b/vllm/tokenizers/mistral.py
+@@ -240,6 +240,7 @@ class MistralTokenizer(TokenizerLike):
+     def __init__(self, tokenizer: "MistralCommonBackend") -> None:
+         super().__init__()
+ 
++        self.is_mistral = True
+         self.transformers_tokenizer = tokenizer
+         self.mistral = tokenizer.tokenizer
+         self.instruct = self.mistral.instruct_tokenizer
+diff --git a/vllm/v1/engine/input_processor.py b/vllm/v1/engine/input_processor.py
+index b4de0e50c..fc5b0665c 100644
+--- a/vllm/v1/engine/input_processor.py
++++ b/vllm/v1/engine/input_processor.py
+@@ -32,7 +32,6 @@ from vllm.pooling_params import PoolingParams
+ from vllm.renderers import BaseRenderer
+ from vllm.sampling_params import _SAMPLING_EPS, SamplingParams
+ from vllm.tokenizers import TokenizerLike
+-from vllm.tokenizers.mistral import MistralTokenizer
+ from vllm.utils import length_from_prompt_token_ids_or_embeds, random_uuid
+ from vllm.utils.torch_utils import set_default_torch_num_threads
+ from vllm.v1.engine import EngineCoreRequest
+@@ -355,7 +354,7 @@ class InputProcessor:
+             # allows <|special_token|> and similar, see
+             # https://github.com/guidance-ai/llguidance/blob/main/docs/syntax.md#special-tokens
+             # Without tokenizer these are disallowed in grammars.
+-            if isinstance(self.tokenizer, MistralTokenizer):
++            if hasattr(self.tokenizer, 'is_mistral'):
+                 raise ValueError(
+                     "Mistral tokenizer is not supported for the 'guidance' "
+                     "structured output backend. Please use ['xgrammar', 'outlines'] "
+@@ -367,7 +366,7 @@ class InputProcessor:
+             validate_structured_output_request_outlines(params)
+         elif backend == "lm-format-enforcer":
+             # lm format enforcer backend
+-            if isinstance(self.tokenizer, MistralTokenizer):
++            if hasattr(self.tokenizer, 'is_mistral'):
+                 raise ValueError(
+                     "Mistral tokenizer is not supported for the 'lm-format-enforcer' "
+                     "structured output backend. Please use ['xgrammar', 'outlines'] "
+@@ -401,7 +400,7 @@ class InputProcessor:
+                         schema = so_params.json
+                     skip_guidance = has_guidance_unsupported_json_features(schema)
+ 
+-                if isinstance(self.tokenizer, MistralTokenizer) or skip_guidance:
++                if hasattr(self.tokenizer, 'is_mistral') or skip_guidance:
+                     # Fall back to outlines if the tokenizer is Mistral
+                     # or if schema contains features unsupported by guidance
+                     validate_structured_output_request_outlines(params)
+diff --git a/vllm/v1/structured_output/backend_xgrammar.py b/vllm/v1/structured_output/backend_xgrammar.py
+index 617132577..c3057f92f 100644
+--- a/vllm/v1/structured_output/backend_xgrammar.py
++++ b/vllm/v1/structured_output/backend_xgrammar.py
+@@ -11,7 +11,6 @@ import vllm.envs
+ from vllm.logger import init_logger
+ from vllm.sampling_params import SamplingParams
+ from vllm.tokenizers.deepseek_v32 import DeepseekV32Tokenizer
+-from vllm.tokenizers.mistral import MistralTokenizer
+ from vllm.utils.import_utils import LazyLoader
+ from vllm.v1.structured_output.backend_types import (
+     StructuredOutputBackend,
+@@ -39,7 +38,7 @@ class XgrammarBackend(StructuredOutputBackend):
+             self.vllm_config.structured_outputs_config.disable_any_whitespace
+         )
+ 
+-        if isinstance(self.tokenizer, MistralTokenizer):
++        if hasattr(self.tokenizer, 'is_mistral'):
+             # NOTE: ideally, xgrammar should handle this accordingly.
+             # refer to https://github.com/mlc-ai/xgrammar/blob/d77c0a0173ef14779c918e3be7966ba852f7910f/python/xgrammar/tokenizer_info.py#L98
+             stop_token_ids = [self.tokenizer.eos_token_id]
+-- 
+2.43.0
+
