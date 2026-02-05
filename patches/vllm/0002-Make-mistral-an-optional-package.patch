@@ -1,14 +1,16 @@
-From 203bceb5349a42adcf3c3913b30591d2073b2241 Mon Sep 17 00:00:00 2001
+From 4f6e856b9cfa3c90a30ea9c83524f271e7233e7f Mon Sep 17 00:00:00 2001
 From: Neil Schemenauer <nas@arctrix.com>
 Date: Thu, 5 Feb 2026 01:42:12 +0000
-Subject: [PATCH 2/2] Make "mistral" an optional package.
+Subject: [PATCH] Make "mistral" an optional package.
 
 ---
- vllm/entrypoints/llm.py                       | 3 +--
- vllm/tokenizers/mistral.py                    | 1 +
- vllm/v1/engine/input_processor.py             | 7 +++----
- vllm/v1/structured_output/backend_xgrammar.py | 3 +--
- 4 files changed, 6 insertions(+), 8 deletions(-)
+ vllm/entrypoints/llm.py                       |  3 +--
+ .../openai/chat_completion/serving.py         | 26 ++++++++++---------
+ vllm/entrypoints/pooling/score/serving.py     |  3 +--
+ vllm/tokenizers/mistral.py                    |  1 +
+ vllm/v1/engine/input_processor.py             |  7 +++--
+ vllm/v1/structured_output/backend_xgrammar.py |  3 +--
+ 6 files changed, 21 insertions(+), 22 deletions(-)
 
 diff --git a/vllm/entrypoints/llm.py b/vllm/entrypoints/llm.py
 index 9ef7af098..eca09a164 100644
@@ -31,6 +33,89 @@ index 9ef7af098..eca09a164 100644
              raise ValueError("Score API is not supported for Mistral tokenizer")
  
          if len(data_1) == 1:
+diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
+index 265cee554..99b27e582 100644
+--- a/vllm/entrypoints/openai/chat_completion/serving.py
++++ b/vllm/entrypoints/openai/chat_completion/serving.py
+@@ -72,14 +72,7 @@ from vllm.logprobs import Logprob
+ from vllm.outputs import CompletionOutput, RequestOutput
+ from vllm.sampling_params import BeamSearchParams, SamplingParams
+ from vllm.tokenizers import TokenizerLike
+-from vllm.tokenizers.mistral import (
+-    MistralTokenizer,
+-    maybe_serialize_tool_calls,
+-    truncate_tool_call_ids,
+-    validate_request_params,
+-)
+ from vllm.tool_parsers import ToolParser
+-from vllm.tool_parsers.mistral_tool_parser import MistralToolCall
+ from vllm.tool_parsers.utils import partial_json_loads
+ from vllm.utils.collection_utils import as_list
+ from vllm.v1.sample.logits_processor import validate_logits_processors_parameters
+@@ -243,10 +236,16 @@ class OpenAIServingChat(OpenAIServing):
+ 
+             tool_parser = self.tool_parser
+ 
+-            if isinstance(tokenizer, MistralTokenizer):
++            if hasattr(tokenizer, "is_mistral"):
+                 # because of issues with pydantic we need to potentially
+                 # re-serialize the tool_calls field of the request
+                 # for more info: see comment in `maybe_serialize_tool_calls`
++                from vllm.tokenizers.mistral import (
++                    maybe_serialize_tool_calls,
++                    truncate_tool_call_ids,
++                    validate_request_params,
++                )
++
+                 maybe_serialize_tool_calls(request)
+                 truncate_tool_call_ids(request)
+                 validate_request_params(request)
+@@ -254,7 +253,7 @@ class OpenAIServingChat(OpenAIServing):
+             # Check if tool parsing is unavailable (common condition)
+             tool_parsing_unavailable = (
+                 tool_parser is None
+-                and not isinstance(tokenizer, MistralTokenizer)
++                and not hasattr(tokenizer, "is_mistral")
+                 and not self.use_harmony
+             )
+ 
+@@ -1521,9 +1520,12 @@ class OpenAIServingChat(OpenAIServing):
+                 enable_auto_tools=self.enable_auto_tools,
+                 tool_parser_cls=self.tool_parser,
+             )
+-            tool_call_class = (
+-                MistralToolCall if isinstance(tokenizer, MistralTokenizer) else ToolCall
+-            )
++            if hasattr(tokenizer, "is_mistral"):
++                from vllm.tool_parsers.mistral_tool_parser import MistralToolCall
++
++                tool_call_class = MistralToolCall
++            else:
++                tool_call_class = ToolCall
+             if (not self.enable_auto_tools or not self.tool_parser) and (
+                 not isinstance(request.tool_choice, ChatCompletionNamedToolChoiceParam)
+                 and request.tool_choice != "required"
+diff --git a/vllm/entrypoints/pooling/score/serving.py b/vllm/entrypoints/pooling/score/serving.py
+index 85c74e5a2..be666b13a 100644
+--- a/vllm/entrypoints/pooling/score/serving.py
++++ b/vllm/entrypoints/pooling/score/serving.py
+@@ -40,7 +40,6 @@ from vllm.logger import init_logger
+ from vllm.lora.request import LoRARequest
+ from vllm.outputs import PoolingRequestOutput, ScoringRequestOutput
+ from vllm.tokenizers import TokenizerLike
+-from vllm.tokenizers.mistral import MistralTokenizer
+ from vllm.utils.async_utils import make_async, merge_async_iterators
+ 
+ logger = init_logger(__name__)
+@@ -199,7 +198,7 @@ class ServingScores(OpenAIServing):
+         if len(data_1) == 1:
+             data_1 = data_1 * len(data_2)
+ 
+-        if isinstance(tokenizer, MistralTokenizer):
++        if hasattr(tokenizer, "is_mistral"):
+             raise ValueError("MistralTokenizer not supported for cross-encoding")
+ 
+         tokenization_kwargs = tokenization_kwargs or {}
 diff --git a/vllm/tokenizers/mistral.py b/vllm/tokenizers/mistral.py
 index bb85052db..e676dfc51 100644
 --- a/vllm/tokenizers/mistral.py
