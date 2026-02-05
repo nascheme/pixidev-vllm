@@ -127,7 +127,7 @@ torch = { version = ">=2.10.0, <3" }
 torchaudio = { version = ">=2.10.0, <3" }
 
 [feature.cuda.tasks.build-cuda]
-cmd ="python -m pip install -e . -v --no-build-isolation --no-deps"
+cmd ="python -s -m pip install -e . -v --no-build-isolation --no-deps"
 cwd = "vllm/vllm"
 description = "Build vLLM in editable mode for CUDA"
 env = { CC = "ccache $CC", CXX = "ccache $CXX", nvcc="ccache nvcc", CMAKE_KEEP_TEMP_FILES="1", CUDA_PATH="$CONDA_PREFIX", CUDA_HOME="$CONDA_PREFIX", CMAKE_CUDA_COMPILER="$CONDA_PREFIX/bin/nvcc", VLLM_FLASH_ATTN_SRC_DIR="$PIXI_PROJECT_ROOT/flash-attention/flash-attention", TORCH_CUDA_ARCH_LIST="7.5", MAX_JOBS="32" }
@@ -140,7 +140,7 @@ torch = { version = ">=2.10.0, <3", index = "https://download.pytorch.org/whl/cp
 torchaudio = { version = ">=2.10.0, <3", index = "https://download.pytorch.org/whl/cpu" }
 
 [feature.cpu.tasks.build-cpu]
-cmd = "VLLM_TARGET_DEVICE=cpu python -m pip install -e . -v --no-build-isolation --no-deps"
+cmd = "VLLM_TARGET_DEVICE=cpu python -s -m pip install -e . -v --no-build-isolation --no-deps"
 cwd = "vllm/vllm"
 description = "Build vLLM in editable mode for CPU"
 env = { CC = "ccache $CC", CXX = "ccache $CXX" }
