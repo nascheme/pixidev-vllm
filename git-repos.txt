@@ -1,4 +1,5 @@
-vllm-project vllm 08e094997ecb28b4c5ad4dd28fd6fbb48adba279
+# vllm v0.15.1
+vllm-project vllm 1892993bc18e243e2c05841314c5e9c06a80c70d
 vllm-project flash-attention 7d346be62004163f0b59f965761b122cc40bd0a3
 dottxt-ai outlines-core 150baae770e9da4b1a26f6440ad4fc5f5fabcf19
 guidance-ai llguidance 5a71c8832d781d481baaa58e7db3213ac70f0fe6

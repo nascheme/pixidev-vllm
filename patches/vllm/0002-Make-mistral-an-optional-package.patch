@@ -1,6 +1,6 @@
-From 21411d6593b84b4f2882c88ea3fd32d453b8242a Mon Sep 17 00:00:00 2001
+From 203bceb5349a42adcf3c3913b30591d2073b2241 Mon Sep 17 00:00:00 2001
 From: Neil Schemenauer <nas@arctrix.com>
-Date: Wed, 4 Feb 2026 20:57:27 +0000
+Date: Thu, 5 Feb 2026 01:42:12 +0000
 Subject: [PATCH 2/2] Make "mistral" an optional package.
 
 ---
@@ -11,10 +11,10 @@ Subject: [PATCH 2/2] Make "mistral" an optional package.
  4 files changed, 6 insertions(+), 8 deletions(-)
 
 diff --git a/vllm/entrypoints/llm.py b/vllm/entrypoints/llm.py
-index f3f774bef..127c8560c 100644
+index 9ef7af098..eca09a164 100644
 --- a/vllm/entrypoints/llm.py
 +++ b/vllm/entrypoints/llm.py
-@@ -74,7 +74,6 @@ from vllm.renderers import ChatParams, TokenizeParams, merge_kwargs
+@@ -70,7 +70,6 @@ from vllm.pooling_params import PoolingParams
  from vllm.sampling_params import BeamSearchParams, RequestOutputKind, SamplingParams
  from vllm.tasks import PoolingTask
  from vllm.tokenizers import TokenizerLike
@@ -22,9 +22,9 @@ index f3f774bef..127c8560c 100644
  from vllm.usage.usage_lib import UsageContext
  from vllm.utils.collection_utils import as_iter, is_list_of
  from vllm.utils.counter import Counter
-@@ -1382,7 +1381,7 @@ class LLM:
+@@ -1253,7 +1252,7 @@ class LLM:
+     ) -> list[ScoringRequestOutput]:
          model_config = self.model_config
-         tokenizer = self.get_tokenizer()
  
 -        if isinstance(tokenizer, MistralTokenizer):
 +        if hasattr(tokenizer, 'is_mistral'):
@@ -44,18 +44,18 @@ index bb85052db..e676dfc51 100644
          self.mistral = tokenizer.tokenizer
          self.instruct = self.mistral.instruct_tokenizer
 diff --git a/vllm/v1/engine/input_processor.py b/vllm/v1/engine/input_processor.py
-index b4de0e50c..fc5b0665c 100644
+index f7f1608ec..5bea73967 100644
 --- a/vllm/v1/engine/input_processor.py
 +++ b/vllm/v1/engine/input_processor.py
 @@ -32,7 +32,6 @@ from vllm.pooling_params import PoolingParams
- from vllm.renderers import BaseRenderer
+ from vllm.renderers import RendererLike
  from vllm.sampling_params import _SAMPLING_EPS, SamplingParams
  from vllm.tokenizers import TokenizerLike
 -from vllm.tokenizers.mistral import MistralTokenizer
  from vllm.utils import length_from_prompt_token_ids_or_embeds, random_uuid
  from vllm.utils.torch_utils import set_default_torch_num_threads
  from vllm.v1.engine import EngineCoreRequest
-@@ -355,7 +354,7 @@ class InputProcessor:
+@@ -344,7 +343,7 @@ class InputProcessor:
              # allows <|special_token|> and similar, see
              # https://github.com/guidance-ai/llguidance/blob/main/docs/syntax.md#special-tokens
              # Without tokenizer these are disallowed in grammars.
@@ -64,7 +64,7 @@ index b4de0e50c..fc5b0665c 100644
                  raise ValueError(
                      "Mistral tokenizer is not supported for the 'guidance' "
                      "structured output backend. Please use ['xgrammar', 'outlines'] "
-@@ -367,7 +366,7 @@ class InputProcessor:
+@@ -356,7 +355,7 @@ class InputProcessor:
              validate_structured_output_request_outlines(params)
          elif backend == "lm-format-enforcer":
              # lm format enforcer backend
@@ -73,7 +73,7 @@ index b4de0e50c..fc5b0665c 100644
                  raise ValueError(
                      "Mistral tokenizer is not supported for the 'lm-format-enforcer' "
                      "structured output backend. Please use ['xgrammar', 'outlines'] "
-@@ -401,7 +400,7 @@ class InputProcessor:
+@@ -390,7 +389,7 @@ class InputProcessor:
                          schema = so_params.json
                      skip_guidance = has_guidance_unsupported_json_features(schema)
  

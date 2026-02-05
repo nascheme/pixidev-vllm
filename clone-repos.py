@@ -2,6 +2,7 @@
 """Clone git repositories listed in git-repos.txt and apply patches."""
 
 import argparse
+import re
 import shlex
 import subprocess
 import sys
@@ -28,6 +29,7 @@ def main():
 
     with open(repos_file) as f:
         for line in f:
+            line = re.sub(r'#.*', '', line)
             line = line.strip()
             if not line:
                 continue

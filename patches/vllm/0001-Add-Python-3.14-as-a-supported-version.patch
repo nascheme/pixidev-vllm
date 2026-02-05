@@ -1,4 +1,4 @@
-From b0ae5c34ded98f16b882c2972f308287c45f77a5 Mon Sep 17 00:00:00 2001
+From c10b2dd71dab74b3744f3089f65c9e4c9f2f61f8 Mon Sep 17 00:00:00 2001
 From: Neil Schemenauer <nas@arctrix.com>
 Date: Wed, 4 Feb 2026 20:56:57 +0000
 Subject: [PATCH 1/2] Add Python 3.14 as a supported version.
@@ -9,7 +9,7 @@ Subject: [PATCH 1/2] Add Python 3.14 as a supported version.
  2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 0000b6d32..ac03a3343 100644
+index 97e96e997..d9bb92a25 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -34,7 +34,7 @@ install(CODE "set(CMAKE_INSTALL_LOCAL_ONLY TRUE)" ALL_COMPONENTS)
@@ -22,7 +22,7 @@ index 0000b6d32..ac03a3343 100644
  # Supported AMD GPU architectures.
  set(HIP_SUPPORTED_ARCHS "gfx906;gfx908;gfx90a;gfx942;gfx950;gfx1030;gfx1100;gfx1101;gfx1200;gfx1201;gfx1150;gfx1151")
 diff --git a/pyproject.toml b/pyproject.toml
-index 30a31d46f..248b21800 100644
+index 19f702df1..59099d144 100644
 --- a/pyproject.toml
 +++ b/pyproject.toml
 @@ -31,7 +31,7 @@ classifiers = [
