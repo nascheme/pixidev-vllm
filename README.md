@@ -10,7 +10,7 @@ Only Python 3.14t on Linux x86-64 is used at the moment, with CPU and CUDA
 builds.
 
 
-## Quickstart
+## Quickstart, pixi build
 
 To get started, install Pixi and then:
 
@@ -28,7 +28,28 @@ $ ./run_simple.sh
 ```
 
 
-## Details
+## Quickstart, Docker image
+
+To build the docker image, run:
+
+```bash
+$ ./build_docker.py
+```
+
+To override the CUDA arch list, run as:
+
+```bash
+$ TORCH_CUDA_ARCH_LIST=8.0 ./build_docker.py
+```
+
+To run a test with the image:
+
+```bash
+$ ./run_docker.sh
+```
+
+
+## Build details
 
 If you are building for the CUDA backend, you will want to review the
 `TORCH_CUDA_ARCH_LIST` and `MAX_JOBS` variables inside the `pixi.toml` file.
@@ -63,5 +84,24 @@ Python 3.14t (free-threaded) yet.  Specifically, the following packages have iss
 * numba: required for N-gram speculative decoding
 * opencv-python-headless: required for video IO
 * deepgemm: GEMM kernels
-* EP kernels wheels (pplx-kernels and DeepEP)
+* EP kernel wheels (pplx-kernels and DeepEP)
 
+
+## Running vLLM, pixi build
+
+Before running vLLM, activate the pixi environment:
+
+```bash
+$ pixi shell -e cuda
+```
+
+You can then run `python` with the `vllm` package available.  See the
+`run_simple.sh` script for an example program run.
+
+
+## Running vLLM, Docker image
+
+See `run_docker.sh` as an example of running tests inside the docker container.
+There will be "python" in the default path and the "vllm" package will be
+available.  You will likely want to mount an outside directory to use as the
+`HF_HOME` folder.
