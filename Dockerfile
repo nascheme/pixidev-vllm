@@ -7,18 +7,21 @@
 #   docker run --gpus all -e PYTHON_GIL=0 vllm-freethreaded \
 #       python -c "import vllm; print(vllm.__version__)"
 #
-# The build uses a multi-stage approach: stages 1–4 compile everything,
-# stage 5 assembles only the runtime files, and stage 6 produces a minimal
-# image based on nvidia/cuda base.  Build with --squash for a single-layer image.
+# The build uses a multi-stage approach. Final stage produces a minimal image
+# based on nvidia/cuda base.  Build with --squash for a single-layer image.
 #
 # Written with help from Claude Opus 4.6.
 
 # ---------------------------------------------------------------------------
-# Stage 1: deps — System packages + uv
+# deps — System packages + uv + Python + Rust
 # ---------------------------------------------------------------------------
-FROM nvidia/cuda:12.8.1-devel-ubuntu24.04 AS deps
+FROM nvidia/cuda:12.8.1-devel-ubuntu24.04 AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
+
+# CUDA env vars
+ENV CUDA_HOME=/usr/local/cuda
+ENV CUDA_PATH=/usr/local/cuda
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
@@ -35,35 +38,23 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         protobuf-compiler \
         ca-certificates
 
-# Set git identity (needed for git am in clone-repos.py)
-RUN git config --global user.email "build@docker.example.com" \
-    && git config --global user.name "Docker Build"
-
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:0.10.2 /uv /uvx /bin/
-
-# ---------------------------------------------------------------------------
-# Stage 2: base — Python 3.14t + Rust
-# ---------------------------------------------------------------------------
-FROM deps AS base
-
-# Create a free-threaded Python 3.14t venv
-RUN uv venv /opt/venv --python cpython-3.14t
-ENV VIRTUAL_ENV=/opt/venv
-ENV PATH="/opt/venv/bin:${PATH}"
-
 # Install Rust (cached across builds; not stored in image layers)
 RUN --mount=type=cache,target=/root/.rustup \
     --mount=type=cache,target=/root/.cargo \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# CUDA env vars
-ENV CUDA_HOME=/usr/local/cuda
-ENV CUDA_PATH=/usr/local/cuda
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:0.10.2 /uv /uvx /bin/
+
+# Create a free-threaded Python 3.14t venv
+RUN uv venv /opt/venv --python cpython-3.14t
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
+
 
 # ---------------------------------------------------------------------------
-# Stage 3: python-deps — Install pip dependencies
+# python-deps — Install pip dependencies
 # ---------------------------------------------------------------------------
 FROM base AS python-deps
 
@@ -80,7 +71,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install -r /tmp/pyproject.toml
 
 # ---------------------------------------------------------------------------
-# Stage 4: build — Clone repos + build from source
+# build — Clone repos + build from source
 # ---------------------------------------------------------------------------
 FROM python-deps AS build
 
@@ -89,6 +80,10 @@ ARG MAX_JOBS="4"
 ARG NVCC_THREADS="4"
 
 WORKDIR /app
+
+# Set git identity (needed for git am in clone-repos.py)
+RUN git config --global user.email "build@docker.example.com" \
+    && git config --global user.name "Docker Build"
 
 # Copy clone infrastructure
 COPY clone-repos.py git-repos.txt ./
@@ -126,6 +121,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Build vllm from source (editable — source tree needed at runtime)
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=cache,target=/root/.ccache \
+    CCACHE_DIR=/root/.ccache \
     VLLM_FLASH_ATTN_SRC_DIR=/app/flash-attention/flash-attention \
     TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}" \
     MAX_JOBS="${MAX_JOBS}" \
@@ -137,7 +133,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         --no-build-isolation --no-deps
 
 # ---------------------------------------------------------------------------
-# Stage 5: staging — Assemble only the files needed at runtime
+# staging — Assemble only the files needed at runtime
 # ---------------------------------------------------------------------------
 FROM build AS staging
 
@@ -163,11 +159,10 @@ RUN set -eux \
     && cp -a /root/.local/share/uv/python /staging/root/.local/share/uv/python \
     # --- vllm source (editable install needs this at runtime) --- \
     && cp -a /app/vllm /staging/app/vllm \
-    && rm -rf /staging/app/vllm/vllm/.deps \
-    && (find /staging/app/vllm -name '.git' -prune -exec rm -rf {} + 2>/dev/null || true)
+    && rm -rf /staging/app/vllm/vllm/.deps
 
 # ---------------------------------------------------------------------------
-# Stage 6: runtime — Minimal production image
+# runtime — Minimal production image
 # ---------------------------------------------------------------------------
 FROM nvidia/cuda:12.8.1-base-ubuntu24.04 AS runtime
 
@@ -178,6 +173,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean \
     && apt-get update && apt-get install -y --no-install-recommends \
+        vim-tiny \
+        less \
+        git \
         numactl \
         libgomp1 \
         ca-certificates \
@@ -195,4 +193,4 @@ ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 ENV PYTHON_GIL=0
 
-WORKDIR /app/vllm/vllm
+WORKDIR /app
