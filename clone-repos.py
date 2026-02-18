@@ -52,9 +52,12 @@ def main():
             print(f"[clone] {org}/{repo} @ {commit}")
             dest.parent.mkdir(parents=True, exist_ok=True)
 
-            run(["git", "clone", f"https://github.com/{org}/{repo}.git", str(dest)])
+            run(["git", "clone",
+                 "--filter=blob:none", "--no-checkout", "--no-tags",
+                 f"https://github.com/{org}/{repo}.git", str(dest)])
             run(["git", "checkout", commit], cwd=dest)
-            run(["git", "submodule", "update", "--init", "--recursive"], cwd=dest)
+            run(["git", "submodule", "update", "--init", "--recursive",
+                 "--filter=blob:none"], cwd=dest)
 
             # Apply patches if any exist
             repo_patches = patches_dir / repo
