@@ -1,0 +1,204 @@
+# syntax=docker/dockerfile:1
+#
+# Build vllm v0.15.1 with free-threaded Python 3.14t using uv (ROCm / AMD GPU).
+#
+# Usage:
+#   docker build --build-arg PYTORCH_ROCM_ARCH="gfx1030" -f Dockerfile.rocm -t vllm-freethreaded-rocm .
+#   docker run -e PYTHON_GIL=0 --device=/dev/kfd --device=/dev/dri \
+#       vllm-freethreaded-rocm python -c "import vllm; print(vllm.__version__)"
+#
+# The build uses a multi-stage approach.  Final stage uses the same ROCm base
+# image (no slim ROCm runtime image exists).  Build with --squash for a
+# single-layer image.
+#
+# Written with help from Claude Opus 4.6.
+
+# ---------------------------------------------------------------------------
+# deps — System packages + uv + Python + Rust
+# ---------------------------------------------------------------------------
+FROM rocm/dev-ubuntu-24.04:7.0-complete AS base
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ROCm env vars
+ENV ROCM_PATH=/opt/rocm
+ENV HIP_PATH=/opt/rocm
+ENV PATH="/opt/rocm/bin:/opt/rocm/llvm/bin:${PATH}"
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean \
+    && apt-get update && apt-get install -y --no-install-recommends \
+        git \
+        ccache \
+        numactl \
+        libnuma-dev \
+        g++ \
+        curl \
+        pkg-config \
+        libssl-dev \
+        protobuf-compiler \
+        ca-certificates
+
+# Install Rust (cached across builds; not stored in image layers)
+RUN --mount=type=cache,target=/root/.rustup \
+    --mount=type=cache,target=/root/.cargo \
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:0.10.2 /uv /uvx /bin/
+
+# Create a free-threaded Python 3.14t venv
+RUN uv venv /opt/venv --python cpython-3.14t
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
+
+
+# ---------------------------------------------------------------------------
+# python-deps — Install pip dependencies
+# ---------------------------------------------------------------------------
+FROM base AS python-deps
+
+# Install PyTorch + torchaudio with ROCm 7.0 index
+RUN --mount=type=cache,target=/root/.cache/uv \
+    UV_HTTP_TIMEOUT=90 uv pip install \
+        "torch>=2.10.0" \
+        "torchaudio>=2.10.0" \
+        --extra-index-url https://download.pytorch.org/whl/rocm7.0
+
+# Install remaining dependencies from pyproject.toml
+COPY pyproject.toml /tmp/pyproject.toml
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install -r /tmp/pyproject.toml
+
+# ---------------------------------------------------------------------------
+# build — Clone repos + build from source
+# ---------------------------------------------------------------------------
+FROM python-deps AS build
+
+ARG PYTORCH_ROCM_ARCH="gfx1102"
+ARG MAX_JOBS="4"
+
+WORKDIR /app
+
+# Set git identity (needed for git am in clone-repos.py)
+RUN git config --global user.email "build@docker.example.com" \
+    && git config --global user.name "Docker Build"
+
+# Copy clone infrastructure
+COPY clone-repos.py git-repos.txt ./
+COPY patches/ patches/
+
+# Clone all required repos
+RUN python clone-repos.py \
+        --repo vllm \
+        --repo flash-attention \
+        --repo harmony \
+        --repo safetensors \
+        --repo tokenizers
+
+# Build safetensors from source (non-editable — goes into site-packages)
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=cache,target=/root/.rustup \
+    --mount=type=cache,target=/root/.cargo \
+    uv pip install safetensors/safetensors/bindings/python \
+        --no-build-isolation --no-deps
+
+# Build tokenizers from source (non-editable)
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=cache,target=/root/.rustup \
+    --mount=type=cache,target=/root/.cargo \
+    uv pip install tokenizers/tokenizers/bindings/python \
+        --no-build-isolation --no-deps
+
+# Build harmony (openai-harmony) from source (non-editable)
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=cache,target=/root/.rustup \
+    --mount=type=cache,target=/root/.cargo \
+    uv pip install harmony/harmony \
+        --no-build-isolation --no-deps
+
+# Pre-fetch triton kernels so the vllm cmake build doesn't re-download on
+# every rebuild.  TRITON_KERNELS_SRC_DIR tells cmake to use a local checkout.
+RUN git clone --depth 1 --branch v3.5.0 \
+        https://github.com/triton-lang/triton.git /app/triton
+
+# Add gfx1102 (RX 7600) to vllm's supported HIP arches — it's supported by
+# PyTorch ROCm but not yet listed in vllm's CMakeLists.txt.
+RUN sed -i 's/gfx1101/gfx1101;gfx1102/' vllm/vllm/CMakeLists.txt
+
+# Build vllm from source (editable — source tree needed at runtime)
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=cache,target=/root/.ccache \
+    CCACHE_DIR=/root/.ccache \
+    VLLM_FLASH_ATTN_SRC_DIR=/app/flash-attention/flash-attention \
+    TRITON_KERNELS_SRC_DIR=/app/triton/python/triton_kernels/triton_kernels \
+    PYTORCH_ROCM_ARCH="${PYTORCH_ROCM_ARCH}" \
+    MAX_JOBS="${MAX_JOBS}" \
+    CC="ccache gcc" \
+    CXX="ccache g++" \
+    CMAKE_HIP_COMPILER_LAUNCHER=ccache \
+    uv pip install -e vllm/vllm -v \
+        --no-build-isolation --no-deps
+
+# Install amdsmi from the ROCm tree into the venv so vllm can detect ROCm GPUs.
+# It's a pure-Python wrapper around a bundled native .so (not a CPython extension),
+# so it works with any Python version.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install /opt/rocm/share/amd_smi --no-deps
+
+# ---------------------------------------------------------------------------
+# staging — Assemble only the files needed at runtime
+# ---------------------------------------------------------------------------
+FROM build AS staging
+
+RUN set -eux \
+    # --- Create staging directory structure --- \
+    && mkdir -p /staging/opt \
+                /staging/root/.local/share/uv \
+                /staging/app \
+    # --- Python venv + the uv-managed Python it symlinks into --- \
+    && cp -a /opt/venv /staging/opt/venv \
+    && cp -a /root/.local/share/uv/python /staging/root/.local/share/uv/python \
+    # --- vllm source (editable install needs this at runtime) --- \
+    && cp -a /app/vllm /staging/app/vllm \
+    && rm -rf /staging/app/vllm/vllm/.deps
+
+# ---------------------------------------------------------------------------
+# runtime — Production image
+# ---------------------------------------------------------------------------
+FROM rocm/dev-ubuntu-24.04:7.0-complete AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Runtime system dependencies
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    	vim-tiny \
+    	less \
+    	git \
+        numactl \
+        libgomp1 \
+        ca-certificates \
+        gcc \
+        libc6-dev
+
+# All runtime files in a single COPY layer
+COPY --from=staging /staging/ /
+
+# Refresh the dynamic linker cache
+RUN ldconfig
+
+# Environment
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="/opt/rocm/bin:/opt/venv/bin:${PATH}"
+ENV ROCM_PATH=/opt/rocm
+ENV HIP_PATH=/opt/rocm
+ENV PYTHON_GIL=0
+ENV HIP_FORCE_DEV_KERNARG=1
+ENV SAFETENSORS_FAST_GPU=1
+
+WORKDIR /app
