@@ -58,11 +58,12 @@ ENV PATH="/opt/venv/bin:${PATH}"
 # ---------------------------------------------------------------------------
 FROM base AS python-deps
 
-# Install PyTorch + torchaudio with CUDA 12.8 index
+# Install PyTorch + torchaudio + torchvision with CUDA 12.8 index
 RUN --mount=type=cache,target=/root/.cache/uv \
     UV_HTTP_TIMEOUT=90 uv pip install \
         "torch>=2.10.0" \
         "torchaudio>=2.10.0" \
+        "torchvision>=0.20.0" \
         --extra-index-url https://download.pytorch.org/whl/cu128
 
 # Install remaining dependencies from pyproject.toml
