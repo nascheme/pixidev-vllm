@@ -16,8 +16,8 @@ def run():
     # Create a sampling params object.
     sampling_params = SamplingParams(temperature=0.8, top_p=0.95)
 
-    # Create an LLM.  Using enforce_eager reduces memory usage.
-    llm = LLM(model=MODEL, enforce_eager=True)
+    # Create an LLM.
+    llm = LLM(model=MODEL)
     # Generate texts from the prompts. The output is a list of RequestOutput objects
     # that contain the prompt, generated text, and other information.
     outputs = llm.generate(prompts, sampling_params)

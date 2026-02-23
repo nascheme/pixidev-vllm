@@ -7,10 +7,11 @@ Subject: [PATCH] Make "mistral" an optional package.
  vllm/entrypoints/llm.py                       |  3 +--
  .../openai/chat_completion/serving.py         | 26 ++++++++++---------
  vllm/entrypoints/pooling/score/serving.py     |  3 +--
+ vllm/multimodal/processing/context.py         |  4 +---
  vllm/tokenizers/mistral.py                    |  1 +
  vllm/v1/engine/input_processor.py             |  7 +++--
  vllm/v1/structured_output/backend_xgrammar.py |  3 +--
- 6 files changed, 21 insertions(+), 22 deletions(-)
+ 7 files changed, 22 insertions(+), 25 deletions(-)
 
 diff --git a/vllm/entrypoints/llm.py b/vllm/entrypoints/llm.py
 index 9ef7af098..eca09a164 100644
@@ -188,6 +189,22 @@ index 617132577..c3057f92f 100644
              # NOTE: ideally, xgrammar should handle this accordingly.
              # refer to https://github.com/mlc-ai/xgrammar/blob/d77c0a0173ef14779c918e3be7966ba852f7910f/python/xgrammar/tokenizer_info.py#L98
              stop_token_ids = [self.tokenizer.eos_token_id]
--- 
+diff --git a/vllm/multimodal/processing/context.py b/vllm/multimodal/processing/context.py
+index d4894a984..3604c15b1 100644
+--- a/vllm/multimodal/processing/context.py
++++ b/vllm/multimodal/processing/context.py
+@@ -359,10 +359,8 @@ class InputProcessingContext:
+
+             typ = ProcessorMixin
+
+-        from vllm.tokenizers.mistral import MistralTokenizer
+-
+         tokenizer = self.tokenizer
+-        if isinstance(tokenizer, MistralTokenizer):
++        if hasattr(tokenizer, 'is_mistral'):
+             tokenizer = tokenizer.transformers_tokenizer
+
+         return cached_processor_from_config(
+--
 2.43.0
 

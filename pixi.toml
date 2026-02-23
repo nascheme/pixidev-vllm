@@ -125,6 +125,7 @@ cuda-version = "12.8.*"
 [feature.cuda.pypi-dependencies]
 torch = { version = ">=2.10.0, <3" }
 torchaudio = { version = ">=2.10.0, <3" }
+torchvision = { version = ">=0.20.0, <1" }
 
 [feature.cuda.tasks.build-cuda]
 cmd ="python -s -m pip install -e . -v --no-build-isolation --no-deps"
