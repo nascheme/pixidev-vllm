@@ -1,0 +1,38 @@
+From f6d96396bc2c2b1271fda6c4e8a2780ee4cc440d Mon Sep 17 00:00:00 2001
+From: Amineh Dadsetan <amineh.dadsetan@gmail.com>
+Date: Sun, 22 Feb 2026 17:26:25 -0800
+Subject: [PATCH 1/2] Fix AttributeError when config missing
+ tie_word_embeddings attribute
+
+---
+ vllm/model_executor/models/qwen2.py | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/vllm/model_executor/models/qwen2.py b/vllm/model_executor/models/qwen2.py
+index ab9eac1a9..29839533f 100644
+--- a/vllm/model_executor/models/qwen2.py
++++ b/vllm/model_executor/models/qwen2.py
+@@ -545,7 +545,11 @@ class Qwen2ForCausalLM(nn.Module, SupportsLoRA, SupportsPP, SupportsEagle3):
+         )
+ 
+         if get_pp_group().is_last_rank:
+-            if config.tie_word_embeddings:
++            tie_word_embeddings = getattr(
++                config, 'tie_word_embeddings',
++                getattr(vllm_config.model_config.hf_config,
++                        'tie_word_embeddings', False))
++            if tie_word_embeddings:
+                 self.lm_head = self.model.embed_tokens
+             else:
+                 self.lm_head = ParallelLMHead(
+@@ -595,6 +599,6 @@ class Qwen2ForCausalLM(nn.Module, SupportsLoRA, SupportsPP, SupportsEagle3):
+     def load_weights(self, weights: Iterable[tuple[str, torch.Tensor]]) -> set[str]:
+         loader = AutoWeightsLoader(
+             self,
+-            skip_prefixes=(["lm_head."] if self.config.tie_word_embeddings else None),
++            skip_prefixes=(["lm_head."] if getattr(self.config, 'tie_word_embeddings', False) else None),
+         )
+         return loader.load_weights(weights)
+-- 
+2.34.1
+
