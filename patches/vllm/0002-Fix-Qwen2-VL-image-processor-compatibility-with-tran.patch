@@ -1,0 +1,26 @@
+From ea69f15466e6feac19c15ba7bb59d7ab55b017cf Mon Sep 17 00:00:00 2001
+From: Amineh Dadsetan <amineh.dadsetan@gmail.com>
+Date: Sun, 22 Feb 2026 17:26:48 -0800
+Subject: [PATCH 2/3] Fix Qwen2-VL image processor compatibility with
+ transformers 4.57.1
+
+---
+ vllm/model_executor/models/qwen2_vl.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/vllm/model_executor/models/qwen2_vl.py b/vllm/model_executor/models/qwen2_vl.py
+index eed559bcb..80ac28800 100644
+--- a/vllm/model_executor/models/qwen2_vl.py
++++ b/vllm/model_executor/models/qwen2_vl.py
+@@ -801,7 +801,7 @@ class Qwen2VLProcessingInfo(BaseProcessingInfo):
+     def get_hf_processor(self, **kwargs: object) -> Qwen2VLProcessor:
+         return self.ctx.get_hf_processor(
+             Qwen2VLProcessor,
+-            use_fast=kwargs.pop("use_fast", True),
++            use_fast=kwargs.pop("use_fast", False),
+             **kwargs,
+         )
+ 
+-- 
+2.47.3
+
